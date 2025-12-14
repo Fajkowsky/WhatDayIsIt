@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WhatDayIsIt - Test Page</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        max-width: 800px;
+        margin: 40px auto;
+        padding: 20px;
+        line-height: 1.6;
+      }
+      h1 {
+        color: #333;
+      }
+      h2 {
+        color: #666;
+        border-bottom: 1px solid #ddd;
+        padding-bottom: 8px;
+        margin-top: 40px;
+      }
+      section {
+        margin-bottom: 30px;
+      }
+      .test-case {
+        background: #f5f5f5;
+        padding: 12px 16px;
+        margin: 8px 0;
+        border-radius: 4px;
+      }
+      .note {
+        color: #888;
+        font-size: 0.9em;
+        font-style: italic;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>WhatDayIsIt - Test Page</h1>
+    <p class="note">
+      Load the extension and refresh this page. Dates should be highlighted with a dotted underline.
+    </p>
+
+    <h2>ISO Formats</h2>
+    <section>
+      <div class="test-case">Standard ISO: 2024-12-25</div>
+      <div class="test-case">ISO with time: 2024-12-25T14:30:00Z</div>
+      <div class="test-case">ISO with timezone: 2024-12-25T14:30:00+02:00</div>
+      <div class="test-case">ISO with milliseconds: 2024-12-25T14:30:00.123Z</div>
+    </section>
+
+    <h2>Numeric Formats (US/UK/EU)</h2>
+    <section>
+      <div class="test-case">US format (MM/DD/YYYY): 12/25/2024</div>
+      <div class="test-case">UK format (DD/MM/YYYY): 25/12/2024</div>
+      <div class="test-case">European format (DD.MM.YYYY): 25.12.2024</div>
+      <div class="test-case">With dashes: 25-12-2024</div>
+      <div class="test-case">Short year: 12/25/24</div>
+      <div class="test-case">With time: 12/25/2024 14:30</div>
+      <div class="test-case">With 12-hour time: 12/25/2024 2:30 PM</div>
+    </section>
+
+    <h2>English Text Dates</h2>
+    <section>
+      <div class="test-case">Full month: January 15, 2024</div>
+      <div class="test-case">With ordinal: January 15th, 2024</div>
+      <div class="test-case">Without comma: January 15 2024</div>
+      <div class="test-case">UK order: 15 January 2024</div>
+      <div class="test-case">UK with ordinal: 15th January 2024</div>
+      <div class="test-case">Abbreviated month: Jan 15, 2024</div>
+      <div class="test-case">Abbreviated with period: Jan. 15, 2024</div>
+      <div class="test-case">September variants: Sep 1, 2024 or Sept 1, 2024</div>
+      <div class="test-case">Month and day only: December 25</div>
+      <div class="test-case">Month and day with ordinal: December 25th</div>
+    </section>
+
+    <h2>English Special Words</h2>
+    <section>
+      <div class="test-case">The meeting is scheduled for today.</div>
+      <div class="test-case">I saw her yesterday at the store.</div>
+      <div class="test-case">The deadline is tomorrow.</div>
+      <div class="test-case">Uppercase: TODAY, YESTERDAY, TOMORROW</div>
+    </section>
+
+    <h2>Polish Dates (Polskie daty)</h2>
+    <section>
+      <div class="test-case">Numeric: 25.12.2024</div>
+      <div class="test-case">Genitive (dopełniacz): 15 stycznia 2024</div>
+      <div class="test-case">Genitive: 25 grudnia 2024</div>
+      <div class="test-case">Genitive: 1 lutego 2024</div>
+      <div class="test-case">Genitive: 10 marca 2024</div>
+      <div class="test-case">Genitive: 5 kwietnia 2024</div>
+      <div class="test-case">Genitive: 20 maja 2024</div>
+      <div class="test-case">Genitive: 15 czerwca 2024</div>
+      <div class="test-case">Genitive: 4 lipca 2024</div>
+      <div class="test-case">Genitive: 15 sierpnia 2024</div>
+      <div class="test-case">Genitive: 1 września 2024</div>
+      <div class="test-case">Genitive: 31 października 2024</div>
+      <div class="test-case">Genitive: 11 listopada 2024</div>
+      <div class="test-case">Nominative (mianownik): 15 styczeń 2024</div>
+      <div class="test-case">Day and month only: 15 stycznia</div>
+      <div class="test-case">Abbreviated: 15 sty. 2024</div>
+    </section>
+
+    <h2>Polish Special Words</h2>
+    <section>
+      <div class="test-case">Spotkanie jest dzisiaj.</div>
+      <div class="test-case">Spotkanie jest dziś.</div>
+      <div class="test-case">Widziałem ją wczoraj.</div>
+      <div class="test-case">Termin jest jutro.</div>
+    </section>
+
+    <h2>Edge Cases</h2>
+    <section>
+      <div class="test-case">
+        Multiple dates in one paragraph: The event starts on January 15, 2024 and ends on January
+        20, 2024. Registration closes on 2024-01-10.
+      </div>
+      <div class="test-case">
+        Date in a link: Check out the event on <a href="#">December 25, 2024</a>
+      </div>
+      <div class="test-case">Date at start: 2024-12-25 is Christmas Day.</div>
+      <div class="test-case">Date at end: Christmas Day is 2024-12-25</div>
+      <div class="test-case">Mixed formats: Meet on 15/12/2024 or December 15, 2024</div>
+      <div class="test-case"><strong>Bold date:</strong> <strong>January 15, 2024</strong></div>
+      <div class="test-case"><em>Italic date:</em> <em>January 15, 2024</em></div>
+    </section>
+
+    <h2>Should NOT Match</h2>
+    <section>
+      <div class="test-case">Phone number: 555-123-4567</div>
+      <div class="test-case">Version number: v2.3.4</div>
+      <div class="test-case">IP address: 192.168.1.1</div>
+      <div class="test-case">Product code: ABC-123-456</div>
+    </section>
+  </body>
+</html>
