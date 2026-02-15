@@ -328,7 +328,12 @@ function removeHighlights() {
     mark.parentNode?.replaceChild(textNode, mark);
   });
   removeStyles();
+  updateBadgeCount(0);
   console.log('Date highlighter: highlights removed');
+}
+
+function updateBadgeCount(count) {
+  chrome.runtime.sendMessage({ action: 'updateBadge', count }).catch(() => {});
 }
 
 async function highlightDates() {
@@ -342,6 +347,7 @@ async function highlightDates() {
     console.warn(
       `Date highlighter: Skipping page with ${textNodes.length} text nodes (max: ${CONFIG.MAX_NODES})`
     );
+    updateBadgeCount(0);
     return;
   }
 
@@ -353,6 +359,9 @@ async function highlightDates() {
   }
 
   const duration = (performance.now() - startTime).toFixed(2);
+
+  const badgeCount = document.querySelectorAll('.date-hl, .date-hl-no-bg').length;
+  updateBadgeCount(badgeCount);
 
   if (CONFIG.DEBUG) {
     console.log(`Date highlighter stats:`, {

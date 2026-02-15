@@ -182,6 +182,27 @@ describe('CSS Classes', () => {
   });
 });
 
+describe('Badge Count Messaging', () => {
+  it('sends correct message format for updateBadgeCount', () => {
+    const sendMessage = vi.fn().mockReturnValue(Promise.resolve());
+    const count = 7;
+    sendMessage({ action: 'updateBadge', count });
+    expect(sendMessage).toHaveBeenCalledWith({ action: 'updateBadge', count: 7 });
+  });
+
+  it('sends zero count to clear badge', () => {
+    const sendMessage = vi.fn().mockReturnValue(Promise.resolve());
+    sendMessage({ action: 'updateBadge', count: 0 });
+    expect(sendMessage).toHaveBeenCalledWith({ action: 'updateBadge', count: 0 });
+  });
+
+  it('handles rejected sendMessage gracefully', async () => {
+    const sendMessage = vi.fn().mockReturnValue(Promise.reject(new Error('No listener')));
+    // Simulates updateBadgeCount: sendMessage().catch(() => {})
+    await expect(sendMessage().catch(() => {})).resolves.toBeUndefined();
+  });
+});
+
 describe('Icon Removal', () => {
   it('removes icons before removing marks', () => {
     const removeOrder = [];

@@ -90,6 +90,7 @@ async function createZip() {
   const filesToInclude = [
     'manifest.json',
     'content.js',
+    'background.js',
     'popup.html',
     'popup.js',
     'icon48.png',
