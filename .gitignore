@@ -23,3 +23,7 @@ npm-debug.log*
 
 # Test coverage
 coverage/
+
+# Local workflow runtime and rendered skill snapshots
+/_bmad/
+/.impeccable/

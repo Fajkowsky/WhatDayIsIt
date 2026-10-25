@@ -48,6 +48,7 @@
         height: 24px;
       }
       .toggle-switch input {
+        position: absolute;
         opacity: 0;
         width: 0;
         height: 0;
@@ -80,6 +81,10 @@
       input:checked + .toggle-slider:before {
         transform: translateX(20px);
       }
+      .toggle-switch input:focus-visible + .toggle-slider {
+        outline: 3px solid #165dbe;
+        outline-offset: 3px;
+      }
       .select-wrapper select {
         padding: 6px 10px;
         border: 1px solid #ddd;
@@ -106,24 +111,24 @@
       <span class="header-title">WhatDayIsIt</span>
     </div>
 
-    <div class="setting-row">
+    <label class="setting-row" for="globalToggle">
       <span class="setting-label">Enable extension</span>
-      <label class="toggle-switch">
-        <input type="checkbox" id="globalToggle" checked />
+      <span class="toggle-switch">
+        <input type="checkbox" id="globalToggle" checked aria-describedby="status" />
         <span class="toggle-slider"></span>
-      </label>
-    </div>
+      </span>
+    </label>
 
-    <div class="setting-row">
+    <label class="setting-row" for="highlightToggle">
       <span class="setting-label">Highlight dates</span>
-      <label class="toggle-switch">
+      <span class="toggle-switch">
         <input type="checkbox" id="highlightToggle" checked />
         <span class="toggle-slider"></span>
-      </label>
-    </div>
+      </span>
+    </label>
 
     <div class="setting-row">
-      <span class="setting-label">Icon position</span>
+      <label class="setting-label" for="iconPosition">Icon position</label>
       <div class="select-wrapper">
         <select id="iconPosition">
           <option value="after">After date</option>
@@ -132,7 +137,7 @@
       </div>
     </div>
 
-    <div class="status" id="status">Enabled on this page</div>
+    <div class="status" id="status" role="status" aria-live="polite">Enabled</div>
 
     <script src="popup.js"></script>
   </body>
