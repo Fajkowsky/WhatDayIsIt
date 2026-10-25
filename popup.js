@@ -1,54 +1,33 @@
-// Popup script for Date Highlighter settings
-
 const globalToggle = document.getElementById('globalToggle');
 const highlightToggle = document.getElementById('highlightToggle');
 const iconPosition = document.getElementById('iconPosition');
 const status = document.getElementById('status');
 
-// Load saved settings
-chrome.storage.sync.get(['enabled', 'highlightEnabled', 'iconPosition'], (result) => {
-  const enabled = result.enabled !== false; // Default to true
-  const highlightEnabled = result.highlightEnabled !== false; // Default to true
-  const position = result.iconPosition || 'after'; // Default to after
-
+function renderSettings(result = {}) {
+  const enabled = result.enabled !== false;
   globalToggle.checked = enabled;
-  highlightToggle.checked = highlightEnabled;
-  iconPosition.value = position;
-  updateStatus(enabled);
-});
-
-// Handle global toggle change
-globalToggle.addEventListener('change', async () => {
-  const enabled = globalToggle.checked;
-  await chrome.storage.sync.set({ enabled });
-  updateStatus(enabled);
-  notifyContentScript({ action: 'toggle', enabled });
-});
-
-// Handle highlight toggle change
-highlightToggle.addEventListener('change', async () => {
-  const highlightEnabled = highlightToggle.checked;
-  await chrome.storage.sync.set({ highlightEnabled });
-  notifyContentScript({ action: 'updateSettings', highlightEnabled });
-});
-
-// Handle icon position change
-iconPosition.addEventListener('change', async () => {
-  const position = iconPosition.value;
-  await chrome.storage.sync.set({ iconPosition: position });
-  notifyContentScript({ action: 'updateSettings', iconPosition: position });
-});
-
-async function notifyContentScript(message) {
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (tab?.id) {
-    chrome.tabs.sendMessage(tab.id, message).catch(() => {
-      // Tab might not have content script loaded
-    });
-  }
+  highlightToggle.checked = result.highlightEnabled !== false;
+  iconPosition.value = result.iconPosition === 'before' ? 'before' : 'after';
+  status.textContent = enabled ? 'Enabled' : 'Disabled';
+  status.style.color = enabled ? '#287a37' : '#666';
 }
 
-function updateStatus(enabled) {
-  status.textContent = enabled ? 'Enabled on this page' : 'Disabled';
-  status.style.color = enabled ? '#4CAF50' : '#999';
+function saveSetting(setting) {
+  chrome.storage.sync.set(setting);
 }
+
+chrome.storage.sync.get(['enabled', 'highlightEnabled', 'iconPosition'], renderSettings);
+chrome.storage.onChanged.addListener((changes, areaName) => {
+  if (areaName !== 'sync') return;
+  chrome.storage.sync.get(['enabled', 'highlightEnabled', 'iconPosition'], renderSettings);
+});
+
+globalToggle.addEventListener('change', () => {
+  saveSetting({ enabled: globalToggle.checked });
+});
+highlightToggle.addEventListener('change', () => {
+  saveSetting({ highlightEnabled: highlightToggle.checked });
+});
+iconPosition.addEventListener('change', () => {
+  saveSetting({ iconPosition: iconPosition.value });
+});
