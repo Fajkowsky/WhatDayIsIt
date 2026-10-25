@@ -20,6 +20,9 @@ export default [
         setTimeout: 'readonly',
         clearTimeout: 'readonly',
         MutationObserver: 'readonly',
+        process: 'readonly',
+        URL: 'readonly',
+        Node: 'readonly',
       },
     },
     rules: {

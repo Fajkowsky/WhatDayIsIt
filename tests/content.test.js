@@ -1,233 +1,217 @@
-import { describe, it, expect, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { JSDOM } from 'jsdom';
+import { bundleContentScript } from '../scripts/build.js';
 
-// Extract the highlight HTML generation logic for testing
-function generateHighlightHtml(match, dayName, hlClass, iconPosition, escapeHtml) {
-  const icon = `<span class="date-hl-icon">🗓<span class="date-hl-tooltip">${dayName}</span></span>`;
-  if (iconPosition === 'before') {
-    return `${icon}<mark class="${hlClass}">${escapeHtml(match)}</mark>`;
+const bundled = bundleContentScript({ write: false });
+const pages = [];
+
+function page(html, settings = {}, search = '', configureWindow = () => {}) {
+  const dom = new JSDOM(`<!doctype html><html lang="en"><body>${html}</body></html>`, {
+    url: `https://example.test/${search}`,
+    runScripts: 'outside-only',
+  });
+  const messages = [];
+  const storageChanged = [];
+  dom.window.chrome = {
+    runtime: {
+      sendMessage: vi.fn((message) => {
+        messages.push(message);
+        return Promise.resolve();
+      }),
+      onMessage: { addListener: vi.fn() },
+    },
+    storage: {
+      sync: { get: vi.fn((keys, callback) => callback(settings)) },
+      onChanged: { addListener: (fn) => storageChanged.push(fn) },
+    },
+  };
+  dom.window.console = { log: vi.fn(), warn: vi.fn() };
+  configureWindow(dom.window);
+  dom.window.eval(bundled);
+  if (dom.window.document.readyState === 'loading') {
+    dom.window.document.dispatchEvent(new dom.window.Event('DOMContentLoaded'));
   }
-  return `<mark class="${hlClass}">${escapeHtml(match)}</mark>${icon}`;
+  pages.push(dom);
+  return { dom, messages, storageChanged };
 }
 
-function escapeHtml(text) {
-  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
-
-describe('Highlight HTML Generation', () => {
-  it('places icon after mark element when iconPosition is "after"', () => {
-    const html = generateHighlightHtml('2024-12-25', 'Wednesday', 'date-hl', 'after', escapeHtml);
-
-    expect(html).toBe(
-      '<mark class="date-hl">2024-12-25</mark><span class="date-hl-icon">🗓<span class="date-hl-tooltip">Wednesday</span></span>'
-    );
-    // Icon should be AFTER the closing </mark> tag
-    expect(html.indexOf('</mark>')).toBeLessThan(html.indexOf('date-hl-icon'));
-  });
-
-  it('places icon before mark element when iconPosition is "before"', () => {
-    const html = generateHighlightHtml('2024-12-25', 'Wednesday', 'date-hl', 'before', escapeHtml);
-
-    expect(html).toBe(
-      '<span class="date-hl-icon">🗓<span class="date-hl-tooltip">Wednesday</span></span><mark class="date-hl">2024-12-25</mark>'
-    );
-    // Icon should be BEFORE the opening <mark> tag
-    expect(html.indexOf('date-hl-icon')).toBeLessThan(html.indexOf('<mark'));
-  });
-
-  it('uses date-hl class when highlight is enabled', () => {
-    const html = generateHighlightHtml('2024-12-25', 'Wednesday', 'date-hl', 'after', escapeHtml);
-
-    expect(html).toContain('class="date-hl"');
-    expect(html).not.toContain('date-hl-no-bg');
-  });
-
-  it('uses date-hl-no-bg class when highlight is disabled', () => {
-    const html = generateHighlightHtml(
-      '2024-12-25',
-      'Wednesday',
-      'date-hl-no-bg',
-      'after',
-      escapeHtml
-    );
-
-    expect(html).toContain('class="date-hl-no-bg"');
-  });
-
-  it('escapes HTML in date text', () => {
-    const html = generateHighlightHtml(
-      '<script>alert(1)</script>',
-      'Wednesday',
-      'date-hl',
-      'after',
-      escapeHtml
-    );
-
-    expect(html).toContain('&lt;script&gt;');
-    expect(html).not.toContain('<script>alert');
-  });
+afterEach(() => {
+  pages.splice(0).forEach((dom) => dom.window.close());
 });
 
-describe('Remove Highlights Logic', () => {
-  it('extracts text content from mark element', () => {
-    const mark = {
-      textContent: '2024-12-25',
-      parentNode: {
-        replaceChild: vi.fn(),
-      },
-    };
-
-    // Simulate the extraction logic
-    const textContent = mark.textContent || '';
-    expect(textContent).toBe('2024-12-25');
+describe('production content bundle', () => {
+  it('uses DOM text nodes so page text that looks like HTML stays literal', () => {
+    const { dom, messages } = page(
+      '<p id="copy">Literal &lt;img src=x onerror=alert(1)&gt; 2024-02-29</p>'
+    );
+    const text = dom.window.document.querySelector('#copy').textContent;
+    expect(text).toBe('Literal <img src=x onerror=alert(1)> 2024-02-29🗓Thursday');
+    expect(dom.window.document.querySelector('#copy img')).toBeNull();
+    expect(dom.window.document.querySelectorAll('.date-hl')).toHaveLength(1);
+    expect(messages.at(-1)).toEqual({ action: 'updateBadge', count: 1 });
   });
 
-  it('handles marks with only text content (icon is outside)', () => {
-    // When icon is outside mark, mark.textContent is just the date
-    const mark = {
-      textContent: 'January 15, 2024',
-    };
-
-    const textContent = mark.textContent || '';
-    expect(textContent).toBe('January 15, 2024');
-    expect(textContent).not.toContain('🗓');
-  });
-});
-
-describe('ProcessBatch Skip Logic', () => {
-  it('should skip nodes inside .date-hl elements', () => {
-    const mockClosest = vi.fn().mockReturnValue(true);
-    const node = {
-      parentElement: {
-        closest: mockClosest,
-      },
-    };
-
-    // Simulate the skip check
-    const shouldSkip = node.parentElement?.closest('.date-hl, .date-hl-no-bg');
-
-    expect(mockClosest).toHaveBeenCalledWith('.date-hl, .date-hl-no-bg');
-    expect(shouldSkip).toBe(true);
+  it('counts valid leap days once and leaves impossible calendar dates plain', () => {
+    const { dom, messages } = page('<p>2024-02-29 2023-02-29 02/31/2024 12/25/2024</p>');
+    expect(dom.window.document.querySelectorAll('.date-hl')).toHaveLength(2);
+    expect(dom.window.document.querySelectorAll('.date-hl-icon')).toHaveLength(2);
+    expect(messages.at(-1).count).toBe(2);
+    expect(dom.window.document.body.textContent).toContain('2023-02-29');
+    expect(dom.window.document.body.textContent).toContain('02/31/2024');
   });
 
-  it('should skip nodes inside .date-hl-no-bg elements', () => {
-    const mockClosest = vi.fn().mockImplementation((selector) => {
-      return selector.includes('date-hl-no-bg');
+  it('chooses ambiguous numeric order from page locale while resolving unambiguous components', () => {
+    const pl = page('<p>03/04/2026 13/04/2026</p>', {}, '?locale=pl');
+    const en = page('<p>03/04/2026 13/04/2026</p>', {}, '?locale=en-US');
+    expect(
+      [...pl.dom.window.document.querySelectorAll('.date-hl-icon')].map((x) => x.textContent)
+    ).toEqual(['🗓Friday', '🗓Monday']);
+    expect(
+      [...en.dom.window.document.querySelectorAll('.date-hl-icon')].map((x) => x.textContent)
+    ).toEqual(['🗓Wednesday', '🗓Monday']);
+  });
+
+  it('supports abbreviated English months with periods and Polish month names', () => {
+    const en = page('<p>Sept. 1, 2024</p>');
+    const pl = page('<p>29 lutego 2024</p>', {}, '?locale=pl');
+    expect(en.dom.window.document.querySelectorAll('.date-hl')).toHaveLength(1);
+    expect(pl.dom.window.document.querySelectorAll('.date-hl')).toHaveLength(1);
+    expect(en.dom.window.document.querySelector('.date-hl-tooltip').textContent).toBe('Sunday');
+    expect(pl.dom.window.document.querySelector('.date-hl-tooltip').textContent).toBe('Thursday');
+  });
+
+  it('reacts to shared settings while disabled and clears current highlights', () => {
+    const { dom, storageChanged } = page('<p>2024-12-25</p>');
+    const get = dom.window.chrome.storage.sync.get;
+    get.mockImplementation((keys, callback) =>
+      callback({ enabled: false, highlightEnabled: false })
+    );
+    storageChanged[0]({ enabled: { newValue: false } }, 'sync');
+    storageChanged[0]({ highlightEnabled: { newValue: false } }, 'sync');
+    expect(dom.window.document.querySelectorAll('.date-hl, .date-hl-no-bg')).toHaveLength(0);
+    expect(dom.window.document.body.textContent).toBe('2024-12-25');
+    expect(dom.window.chrome.runtime.sendMessage).toHaveBeenLastCalledWith({
+      action: 'updateBadge',
+      count: 0,
     });
-    const node = {
-      parentElement: {
-        closest: mockClosest,
-      },
-    };
-
-    const shouldSkip = node.parentElement?.closest('.date-hl, .date-hl-no-bg');
-    expect(shouldSkip).toBe(true);
   });
 
-  it('should not skip nodes outside highlight elements', () => {
-    const mockClosest = vi.fn().mockReturnValue(null);
-    const node = {
-      parentElement: {
-        closest: mockClosest,
-      },
-    };
-
-    const shouldSkip = node.parentElement?.closest('.date-hl, .date-hl-no-bg');
-    expect(shouldSkip).toBe(null);
-  });
-});
-
-describe('CSS Classes', () => {
-  const cssContent = `
-    .date-hl {
-      background: #fff3cd;
-      color: inherit;
-      padding: 0 2px;
-      border-radius: 2px;
-      cursor: default;
-    }
-    .date-hl-no-bg {
-      background: transparent;
-      color: inherit;
-      padding: 0;
-      cursor: default;
-    }
-    .date-hl-icon {
-      display: inline-block;
-      margin: 0 2px;
-      cursor: help;
-      position: relative;
-      font-style: normal;
-      background: transparent;
-    }
-  `;
-
-  it('date-hl has yellow background', () => {
-    expect(cssContent).toContain('.date-hl {');
-    expect(cssContent).toMatch(/\.date-hl \{[^}]*background: #fff3cd/);
-  });
-
-  it('date-hl-no-bg has transparent background', () => {
-    expect(cssContent).toContain('.date-hl-no-bg {');
-    expect(cssContent).toMatch(/\.date-hl-no-bg \{[^}]*background: transparent/);
-  });
-
-  it('date-hl-icon has transparent background (no yellow bleed)', () => {
-    expect(cssContent).toContain('.date-hl-icon {');
-    expect(cssContent).toMatch(/\.date-hl-icon \{[^}]*background: transparent/);
-  });
-
-  it('both highlight classes inherit text color', () => {
-    expect(cssContent).toMatch(/\.date-hl \{[^}]*color: inherit/);
-    expect(cssContent).toMatch(/\.date-hl-no-bg \{[^}]*color: inherit/);
-  });
-});
-
-describe('Badge Count Messaging', () => {
-  it('sends correct message format for updateBadgeCount', () => {
-    const sendMessage = vi.fn().mockReturnValue(Promise.resolve());
-    const count = 7;
-    sendMessage({ action: 'updateBadge', count });
-    expect(sendMessage).toHaveBeenCalledWith({ action: 'updateBadge', count: 7 });
-  });
-
-  it('sends zero count to clear badge', () => {
-    const sendMessage = vi.fn().mockReturnValue(Promise.resolve());
-    sendMessage({ action: 'updateBadge', count: 0 });
-    expect(sendMessage).toHaveBeenCalledWith({ action: 'updateBadge', count: 0 });
-  });
-
-  it('handles rejected sendMessage gracefully', async () => {
-    const sendMessage = vi.fn().mockReturnValue(Promise.reject(new Error('No listener')));
-    // Simulates updateBadgeCount: sendMessage().catch(() => {})
-    await expect(sendMessage().catch(() => {})).resolves.toBeUndefined();
-  });
-});
-
-describe('Icon Removal', () => {
-  it('removes icons before removing marks', () => {
-    const removeOrder = [];
-
-    const icons = [
-      { remove: () => removeOrder.push('icon1') },
-      { remove: () => removeOrder.push('icon2') },
-    ];
-
-    const marks = [
-      {
-        textContent: 'date1',
-        parentNode: { replaceChild: () => removeOrder.push('mark1') },
-      },
-    ];
-
-    // Simulate removeHighlights logic
-    icons.forEach((icon) => icon.remove());
-    marks.forEach((mark) => {
-      mark.parentNode.replaceChild();
+  it('ignores older initial and settings reads that resolve out of order', () => {
+    const callbacks = [];
+    const { dom, storageChanged, messages } = page('<p>2024-12-25</p>', {}, '', (window) => {
+      window.chrome.storage.sync.get = vi.fn((_keys, callback) => callbacks.push(callback));
     });
+    expect(callbacks).toHaveLength(1);
 
-    // Icons should be removed first
-    expect(removeOrder[0]).toBe('icon1');
-    expect(removeOrder[1]).toBe('icon2');
-    expect(removeOrder[2]).toBe('mark1');
+    storageChanged[0]({ enabled: { newValue: false } }, 'sync');
+    storageChanged[0]({ iconPosition: { newValue: 'before' } }, 'sync');
+    expect(callbacks).toHaveLength(3);
+
+    callbacks[2]({ enabled: false, highlightEnabled: false, iconPosition: 'before' });
+    callbacks[1]({ enabled: true, highlightEnabled: true, iconPosition: 'after' });
+    callbacks[0]({ enabled: true, highlightEnabled: true, iconPosition: 'after' });
+
+    expect(dom.window.document.querySelectorAll('.date-hl, .date-hl-no-bg')).toHaveLength(0);
+    expect(messages.at(-1)).toEqual({ action: 'updateBadge', count: 0 });
+  });
+
+  it('refreshes enabled pages when icon position and highlighting preferences change', async () => {
+    const settings = {};
+    const { dom, storageChanged, messages } = page('<p>2024-12-25</p>', settings);
+    Object.assign(settings, { iconPosition: 'before', highlightEnabled: false });
+    storageChanged[0]({ iconPosition: { newValue: 'before' } }, 'sync');
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const mark = dom.window.document.querySelector('.date-hl-no-bg');
+    expect(mark.textContent).toBe('2024-12-25');
+    expect(mark.previousSibling.className).toBe('date-hl-icon');
+    expect(dom.window.document.querySelectorAll('.date-hl-icon')).toHaveLength(1);
+    expect(dom.window.document.querySelector('.date-hl')).toBeNull();
+    expect(messages.at(-1)).toEqual({ action: 'updateBadge', count: 1 });
+  });
+
+  it('updates the current date markup and badge after dynamic removal', async () => {
+    const { dom, messages } = page('<p id="dates">2024-12-25</p>');
+    dom.window.document.querySelector('#dates').textContent = '2024-12-26';
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    expect(dom.window.document.querySelectorAll('.date-hl')).toHaveLength(1);
+    expect(dom.window.document.querySelector('.date-hl').textContent).toBe('2024-12-26');
+    expect(messages.at(-1)).toEqual({ action: 'updateBadge', count: 1 });
+  });
+
+  it('detects a date in a newly inserted page node and refreshes the badge', async () => {
+    const { dom, messages } = page('<main id="content"></main>');
+    dom.window.document
+      .querySelector('#content')
+      .insertAdjacentHTML('beforeend', '<p id="added">The appointment is on 2024-12-25.</p>');
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    expect(dom.window.document.querySelectorAll('#added .date-hl')).toHaveLength(1);
+    expect(messages.at(-1)).toEqual({ action: 'updateBadge', count: 1 });
+  });
+
+  it.each(['remove', 'replaceChildren', 'textContent'])(
+    'recounts when a page clears highlighted content using %s',
+    async (operation) => {
+      const { dom, messages } = page('<div id="dates"><p>2024-12-25</p></div>');
+      expect(dom.window.document.querySelectorAll('.date-hl')).toHaveLength(1);
+      const dates = dom.window.document.querySelector('#dates');
+      if (operation === 'remove') dates.remove();
+      else if (operation === 'replaceChildren') dates.querySelector('p').replaceChildren();
+      else dates.querySelector('p').textContent = '';
+      await new Promise((resolve) => setTimeout(resolve, 400));
+      expect(dom.window.document.querySelectorAll('.date-hl, .date-hl-no-bg')).toHaveLength(0);
+      expect(messages.at(-1)).toEqual({ action: 'updateBadge', count: 0 });
+    }
+  );
+
+  it('does not let an obsolete idle scan restore marks after disable', async () => {
+    const settings = {};
+    const html = Array.from(
+      { length: 150 },
+      (_, index) => `<p>2024-12-${String((index % 28) + 1).padStart(2, '0')}</p>`
+    ).join('');
+    const { dom, storageChanged, messages } = page(html, settings);
+    settings.enabled = false;
+    storageChanged[0]({ enabled: { newValue: false } }, 'sync');
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    expect(dom.window.document.querySelectorAll('.date-hl, .date-hl-no-bg')).toHaveLength(0);
+    expect(messages.at(-1)).toEqual({ action: 'updateBadge', count: 0 });
+  });
+
+  it('skips detached text nodes captured by an async scan', async () => {
+    const idleCallbacks = [];
+    const removedNodes = Array.from(
+      { length: 120 },
+      (_, index) => `<p>2024-12-${String((index % 28) + 1).padStart(2, '0')}</p>`
+    ).join('');
+    const { dom, messages } = page(
+      `<div id="discard">${removedNodes}</div><p id="keep">2024-12-31</p>`,
+      {},
+      '',
+      (window) => {
+        window.requestIdleCallback = (callback) => {
+          idleCallbacks.push(callback);
+          return idleCallbacks.length;
+        };
+        window.cancelIdleCallback = vi.fn();
+      }
+    );
+    const runOneBatch = (callback) => {
+      let checks = 0;
+      callback({ timeRemaining: () => (checks++ === 0 ? 1 : 0) });
+    };
+
+    runOneBatch(idleCallbacks.shift());
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    dom.window.document.querySelector('#discard').remove();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    while (idleCallbacks.length) {
+      runOneBatch(idleCallbacks.shift());
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+    await new Promise((resolve) => setTimeout(resolve, 400));
+
+    expect(dom.window.document.querySelectorAll('.date-hl, .date-hl-no-bg')).toHaveLength(1);
+    expect(dom.window.document.querySelector('#keep .date-hl').textContent).toBe('2024-12-31');
+    expect(messages.at(-1)).toEqual({ action: 'updateBadge', count: 1 });
   });
 });

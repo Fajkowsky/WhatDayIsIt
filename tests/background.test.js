@@ -1,88 +1,77 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'fs';
 
-describe('Badge Text Logic', () => {
-  it('converts positive count to string', () => {
-    const count = 12;
-    const text = count > 0 ? String(count) : '';
-    expect(text).toBe('12');
-  });
+const source = readFileSync(new URL('../background.js', import.meta.url), 'utf8');
 
-  it('converts zero count to empty string', () => {
-    const count = 0;
-    const text = count > 0 ? String(count) : '';
-    expect(text).toBe('');
-  });
+function background() {
+  const listeners = { message: null, removed: null, updated: null, storage: null };
+  const chrome = {
+    runtime: { onMessage: { addListener: (fn) => (listeners.message = fn) } },
+    tabs: {
+      onRemoved: { addListener: (fn) => (listeners.removed = fn) },
+      onUpdated: { addListener: (fn) => (listeners.updated = fn) },
+      query: vi.fn((query, callback) => callback([{ id: 1 }, { id: 2 }, {}])),
+    },
+    storage: { onChanged: { addListener: (fn) => (listeners.storage = fn) } },
+    action: { setBadgeText: vi.fn(), setBadgeBackgroundColor: vi.fn() },
+  };
+  new Function('chrome', source)(chrome);
+  return { chrome, listeners };
+}
 
-  it('converts single digit count to string', () => {
-    const count = 5;
-    const text = count > 0 ? String(count) : '';
-    expect(text).toBe('5');
-  });
-
-  it('handles large counts', () => {
-    const count = 999;
-    const text = count > 0 ? String(count) : '';
-    expect(text).toBe('999');
-  });
-});
-
-describe('Tab Count Map Operations', () => {
-  let tabCounts;
-
+describe('background service worker', () => {
+  let state;
   beforeEach(() => {
-    tabCounts = new Map();
+    state = background();
   });
 
-  it('stores count for a tab', () => {
-    tabCounts.set(1, 5);
-    expect(tabCounts.get(1)).toBe(5);
+  it('updates only a valid sender tab with a non-negative integer count', () => {
+    const { chrome, listeners } = state;
+    listeners.message({ action: 'updateBadge', count: 12 }, { tab: { id: 7 } });
+    expect(chrome.action.setBadgeText).toHaveBeenCalledWith({ text: '12', tabId: 7 });
+    expect(chrome.action.setBadgeBackgroundColor).toHaveBeenCalledWith({
+      color: '#4CAF50',
+      tabId: 7,
+    });
+    for (const [message, sender] of [
+      [{ action: 'updateBadge', count: 1 }, {}],
+      [{ action: 'updateBadge', count: -1 }, { tab: { id: 8 } }],
+      [{ action: 'updateBadge', count: '2' }, { tab: { id: 8 } }],
+      [null, { tab: { id: 8 } }],
+    ])
+      listeners.message(message, sender);
+    expect(chrome.action.setBadgeText).toHaveBeenCalledTimes(1);
   });
 
-  it('updates count for existing tab', () => {
-    tabCounts.set(1, 5);
-    tabCounts.set(1, 10);
-    expect(tabCounts.get(1)).toBe(10);
+  it('clears the correct badge on navigation and removes closed tab counts', () => {
+    const { chrome, listeners } = state;
+    listeners.message({ action: 'updateBadge', count: 3 }, { tab: { id: 4 } });
+    listeners.updated(4, { status: 'loading' });
+    listeners.removed(4);
+    expect(chrome.action.setBadgeText).toHaveBeenLastCalledWith({ text: '', tabId: 4 });
   });
 
-  it('tracks multiple tabs independently', () => {
-    tabCounts.set(1, 5);
-    tabCounts.set(2, 12);
-    tabCounts.set(3, 0);
-    expect(tabCounts.get(1)).toBe(5);
-    expect(tabCounts.get(2)).toBe(12);
-    expect(tabCounts.get(3)).toBe(0);
+  it('clears badges across open tabs when the shared setting is disabled', () => {
+    const { chrome, listeners } = state;
+    listeners.storage({ enabled: { newValue: false } }, 'sync');
+    expect(chrome.tabs.query).toHaveBeenCalledWith({}, expect.any(Function));
+    expect(chrome.action.setBadgeText).toHaveBeenCalledWith({ text: '', tabId: 1 });
+    expect(chrome.action.setBadgeText).toHaveBeenCalledWith({ text: '', tabId: 2 });
   });
 
-  it('removes tab on cleanup', () => {
-    tabCounts.set(1, 5);
-    tabCounts.set(2, 10);
-    tabCounts.delete(1);
-    expect(tabCounts.has(1)).toBe(false);
-    expect(tabCounts.get(2)).toBe(10);
-  });
+  it('ignores an old disable query after re-enable and a fresh badge update', () => {
+    const { chrome, listeners } = state;
+    let finishOldQuery;
+    chrome.tabs.query.mockImplementation((_query, callback) => {
+      finishOldQuery = callback;
+    });
 
-  it('handles delete of non-existent tab gracefully', () => {
-    tabCounts.delete(999);
-    expect(tabCounts.size).toBe(0);
-  });
-});
+    listeners.storage({ enabled: { newValue: false } }, 'sync');
+    listeners.storage({ enabled: { newValue: true } }, 'sync');
+    listeners.message({ action: 'updateBadge', count: 9 }, { tab: { id: 1 } });
+    finishOldQuery([{ id: 1 }, { id: 2 }]);
 
-describe('Message Handling', () => {
-  it('extracts count from updateBadge message', () => {
-    const message = { action: 'updateBadge', count: 7 };
-    expect(message.action).toBe('updateBadge');
-    expect(message.count).toBe(7);
-  });
-
-  it('defaults to 0 when count is missing', () => {
-    const message = { action: 'updateBadge' };
-    const count = message.count || 0;
-    expect(count).toBe(0);
-  });
-
-  it('ignores messages with wrong action', () => {
-    const message = { action: 'toggle', enabled: true };
-    const isUpdateBadge = message.action === 'updateBadge';
-    expect(isUpdateBadge).toBe(false);
+    expect(chrome.action.setBadgeText).toHaveBeenLastCalledWith({ text: '9', tabId: 1 });
+    expect(chrome.action.setBadgeText).not.toHaveBeenCalledWith({ text: '', tabId: 1 });
   });
 });
