@@ -30,7 +30,6 @@ The extension stores only these preferences using Chrome's built-in `chrome.stor
 
 The extension requires these permissions:
 
-- **activeTab**: Declared by the extension for access to the active browser tab
 - **storage**: To save and synchronize the three preferences listed above
 
 The content script is declared for web pages and processes their text in the browser. It makes no runtime network requests.

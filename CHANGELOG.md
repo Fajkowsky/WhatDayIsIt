@@ -3,6 +3,7 @@
 ## 1.4.0 — October 25, 2026
 
 - Add a per-tab date-count badge that refreshes when page content changes and clears on disable or navigation.
+- Remove the unused activeTab permission; date detection uses the declared content script.
 - Build date markup with DOM nodes so page text is never interpreted as HTML.
 - Validate calendar dates, including leap days, before highlighting or counting them.
 - Resolve ambiguous numeric dates by page locale while keeping unambiguous dates consistent.

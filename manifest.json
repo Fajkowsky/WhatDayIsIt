@@ -3,7 +3,7 @@
   "name": "WhatDayIsIt - Date Highlighter & Day Finder",
   "version": "1.4",
   "description": "Instantly see what day any date falls on. Highlights dates on any webpage - hover to see Monday, Tuesday, etc.",
-  "permissions": ["activeTab", "storage"],
+  "permissions": ["storage"],
   "action": {
     "default_popup": "popup.html",
     "default_icon": {
