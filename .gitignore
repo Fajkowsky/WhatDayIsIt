@@ -26,4 +26,5 @@ coverage/
 
 # Local workflow runtime and rendered skill snapshots
 /_bmad/
-/.impeccable/
+/.impeccable/*
+!/.impeccable/config.json

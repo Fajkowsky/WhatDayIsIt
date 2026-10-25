@@ -1,0 +1,26 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "flat-type-hierarchy",
+        "value": "*",
+        "files": [
+          "tests/test-page.html"
+        ],
+        "createdAt": "2026-10-25T14:28:58.919Z",
+        "reason": "Agent verified in Chrome at desktop and mobile widths: browser heading defaults render h1 at 32px, h2 at 24px and body at 16px; the static detector incorrectly assumes 16px headings."
+      },
+      {
+        "rule": "overused-font",
+        "value": "inter",
+        "files": [
+          "tests/store-preview.html"
+        ],
+        "createdAt": "2026-10-25T14:28:58.990Z",
+        "reason": "Agent: intentional neutral font stack for the synthetic webpage used in real extension store screenshots; preserve the verified fixture rather than redesign unrelated webpage typography."
+      }
+    ]
+  }
+}
