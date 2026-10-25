@@ -76,6 +76,7 @@ context: ['README.md', 'CLAUDE.md']
 - Independent review completed with three separate reviewers. Fixed stale initialization/settings reads, stale disable-query badge clearing, early ISO years including year-zero leap day, and normal-suite insertion coverage. Older matching/accessibility limits are documented in deferred-work.md rather than represented as new regressions.
 - Final verification after review: `npm run package` passes 42 tests, lint and formatting; bundle syntax and seven ZIP/source byte comparisons pass. Installed Chrome for Testing checks pass again on this final build; `npm audit --omit=dev --json` reports zero runtime advisories. Existing development dependency advisories were not upgraded in this release.
 - Final package: 41439 bytes; SHA-256 `32ab768ea7da840c6ba5b3ff02cad0be1243d1f678ffa47e74adfee3e474101f`. Source delivery does not constitute Chrome Web Store submission or publication.
+- Chrome Web Store submission on October 25, 2026: removed the unused activeTab permission, rebuilt and reverified all 42 tests plus real browser behavior, and uploaded the final 41431-byte ZIP with SHA-256 `48316e41c22ddd2bd2cda24fbeb4554329280647b76a1309dc35ed731564218c`. Pending review was verified at 16:06 UTC with automatic publication enabled; the public listing remained on 1.3. See [release record](../../docs/releases/1.4.md).
 
 ## Spec Change Log
 

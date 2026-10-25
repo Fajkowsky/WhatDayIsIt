@@ -25,7 +25,7 @@ For numeric dates, a component above 12 determines the day position. Otherwise, 
 
 ## Install
 
-[Get WhatDayIsIt from the Chrome Web Store](https://chromewebstore.google.com/detail/whatdayisit-date-highligh/cfkjhomjejdhjnhnkbcjamdfjkkpebec). The published listing currently serves v1.3; v1.4 in this repository is not published yet.
+[Get WhatDayIsIt from the Chrome Web Store](https://chromewebstore.google.com/detail/whatdayisit-date-highligh/cfkjhomjejdhjnhnkbcjamdfjkkpebec). Version 1.4 was submitted for review on October 25, 2026, with automatic publication after approval. See the [release record](docs/releases/1.4.md) for the last verified status.
 
 ### Load the v1.4 source locally
 
